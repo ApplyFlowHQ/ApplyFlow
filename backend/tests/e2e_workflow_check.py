@@ -142,3 +142,32 @@ def test_review_and_send_once(locale, iteration, browser, isolated_app, tmp_path
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         page.screenshot(path=tmp_path / "tracker.png")
         print(f"{locale} run {iteration + 1}: one outbox row, one handoff, replay blocked. Evidence {tmp_path}")
+
+
+@pytest.mark.parametrize("locale", ["en", "ar"])
+def test_claim_fields_have_localized_names_and_tab_order(browser, isolated_app, locale):
+    names = {
+        "en": ["One-time setup code (never in URL)", "Owner email address", "Full name",
+               "Owner password (min 10 characters)", "Timezone (IANA)"],
+        "ar": ["رمز الإعداد لمرة واحدة (لا يوضع في الرابط)", "البريد الإلكتروني للمالك", "الاسم الكامل",
+               "كلمة مرور المالك (10 أحرف على الأقل)", "المنطقة الزمنية (IANA)"],
+    }
+    page = browser.new_page(viewport={"width": 390 if locale == "ar" else 1280, "height": 844})
+    try:
+        page.goto(isolated_app.url + "/setup")
+        switch = page.get_by_role("button", name="العربية", exact=True)
+        if locale == "ar":
+            switch.click()
+            switch = page.get_by_role("button", name="English", exact=True)
+        expect(page.locator("html")).to_have_attribute("dir", "rtl" if locale == "ar" else "ltr")
+        switch.focus()
+        form = page.locator("form")
+        for name in names[locale]:
+            page.keyboard.press("Tab")
+            field = form.get_by_label(name, exact=True)
+            expect(field).to_be_focused()
+            expect(field).to_have_accessible_name(name)
+        page.keyboard.press("Tab")
+        expect(form.locator("button[type=submit]")).to_be_focused()
+    finally:
+        page.close()

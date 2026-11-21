@@ -153,8 +153,9 @@ export const SetupWizardPage: React.FC<SetupWizardProps> = ({
 
           <form onSubmit={handleClaim} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.setup.setupCodeLabel}</label>
+              <label htmlFor="claim-setup-code" className="block text-xs font-medium text-slate-700 mb-1">{t.setup.setupCodeLabel}</label>
               <input
+                id="claim-setup-code"
                 type="password"
                 required
                 autoComplete="off"
@@ -169,8 +170,9 @@ export const SetupWizardPage: React.FC<SetupWizardProps> = ({
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.setup.ownerEmailLabel}</label>
+                    <label htmlFor="claim-owner-email" className="block text-xs font-medium text-slate-700 mb-1">{t.setup.ownerEmailLabel}</label>
                     <input
+                      id="claim-owner-email"
                       type="email"
                       required
                       value={ownerEmail}
@@ -179,8 +181,9 @@ export const SetupWizardPage: React.FC<SetupWizardProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.auth.fullName}</label>
+                    <label htmlFor="claim-owner-name" className="block text-xs font-medium text-slate-700 mb-1">{t.auth.fullName}</label>
                     <input
+                      id="claim-owner-name"
                       type="text"
                       value={ownerName}
                       onChange={(e) => setOwnerName(e.target.value)}
@@ -190,8 +193,9 @@ export const SetupWizardPage: React.FC<SetupWizardProps> = ({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.setup.ownerPasswordLabel}</label>
+                    <label htmlFor="claim-owner-password" className="block text-xs font-medium text-slate-700 mb-1">{t.setup.ownerPasswordLabel}</label>
                     <input
+                      id="claim-owner-password"
                       type="password"
                       required
                       minLength={10}
@@ -201,8 +205,9 @@ export const SetupWizardPage: React.FC<SetupWizardProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.auth.timezone}</label>
+                    <label htmlFor="claim-timezone" className="block text-xs font-medium text-slate-700 mb-1">{t.auth.timezone}</label>
                     <input
+                      id="claim-timezone"
                       type="text"
                       required
                       value={timezone}
