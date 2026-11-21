@@ -38,6 +38,51 @@ def outbox_count():
         return db.scalar(select(func.count()).select_from(OutboxEntry))
 
 
+@pytest.mark.parametrize("locale", ["en", "ar"])
+def test_both_batch_controls_persist_selected_mode(locale, browser, isolated_app, tmp_path, monkeypatch):
+    from app.api import routes_automation
+    from tests.workflow_browser_harness import open_page, prepare_workspace
+
+    # The HTTP API and persistence are real. Stop at the broker boundary for the payload matrix.
+    monkeypatch.setattr(routes_automation, "_publish_discovery_batch", lambda _batch_id: None)
+    with open_page(browser, isolated_app.url, locale, tmp_path) as page:
+        prepare_workspace(page.request, locale)
+        page.goto(isolated_app.url + "/batches")
+        demo = page.locator('input[name=batch_mode][value=demo_fixture]')
+        expect(demo).to_be_visible()
+        expect(demo).to_be_checked()
+        page.get_by_text("More discovery options" if locale == "en" else "خيارات بحث إضافية", exact=True).click()
+        page.locator("#batch-goal-count").fill("2")
+        page.locator("#batch-max-queries").fill("3")
+        page.get_by_role("combobox", name=re.compile("standing|دعوات", re.I)).select_option("yes")
+        for mode in ["demo_fixture", "dry_run", "approval_required"]:
+            page.locator(f'input[name=batch_mode][value="{mode}"]').check()
+            canonical = "live" if mode == "approval_required" else mode
+            form = page.locator("form").filter(has=page.get_by_test_id("find-and-prepare"))
+            paste = form.get_by_role("checkbox")
+            paste.set_checked(mode == "dry_run")
+            extra = {}
+            if mode == "dry_run":
+                text = "Fictional vacancy for the local browser test."
+                form.locator("textarea").fill(text)
+                extra["pasted_posting"] = {"title": "Public Job Posting", "company_name": "",
+                                           "source_url": "", "location_raw": "", "raw_text": text}
+            for button in [page.get_by_test_id("find-and-prepare"),
+                           page.get_by_role("button", name="Start Batch" if locale == "en" else "بدء الدفعة", exact=True)]:
+                with page.expect_response(lambda r: r.request.method == "POST" and r.url.endswith("/batches")) as event:
+                    button.click()
+                response = event.value
+                assert response.request.post_data_json == {
+                    "mode": canonical, "run_mode": mode, "run_immediately": True,
+                    "target_goal_count": 2, "max_search_queries": 3, "include_standing_invitations": True, **extra,
+                }
+                assert response.status == 201
+                result = response.json()
+                assert (result["mode"], result["run_mode"]) == (canonical, mode)
+                stored = page.request.get("/api/v1/batches/" + result["batch_id"]).json()["batch"]
+                assert (stored["mode"], stored["run_mode"]) == (canonical, mode)
+
+
 @pytest.mark.parametrize("iteration", range(int(os.getenv("WORKFLOW_REPEATS", "1"))))
 @pytest.mark.parametrize("locale", ["en", "ar"], ids=["desktop-ltr", "mobile-rtl"])
 def test_review_and_send_once(locale, iteration, browser, isolated_app, tmp_path):
@@ -51,6 +96,7 @@ def test_review_and_send_once(locale, iteration, browser, isolated_app, tmp_path
         expect(page.locator("html")).to_have_attribute("dir", "rtl" if ar else "ltr")
         expect(page.locator("html")).to_have_attribute("lang", locale)
         find = page.get_by_role("button", name="البحث عن الوظائف وتجهيز الطلبات" if ar else "Find and Prepare Applications")
+        page.locator('input[name=batch_mode][value=approval_required]').check()
         with page.expect_response(lambda r: r.request.method == "POST" and r.url.endswith("/batches")) as started:
             find.click()
         batch = started.value.json()

@@ -78,14 +78,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user, onRefreshUse
     loadData();
   }, []);
 
-  const startQuickBatch = async (mode: 'dry_run' | 'demo_fixture' | 'live') => {
+  const startQuickBatch = async (mode: 'dry_run' | 'demo_fixture') => {
     setError('');
     setActionBusy(true);
     try {
       const res = await apiRequest<{ batch_id: string }>('/batches', {
         method: 'POST',
         idempotencyKey: `dash-${mode}-${Date.now()}`,
-        body: JSON.stringify({ mode, run_mode: mode === 'live' ? 'approval_required' : mode, run_immediately: true }),
+        body: JSON.stringify({ mode, run_mode: mode, run_immediately: true }),
       });
       navigate(`/batches?selected=${res.batch_id}`);
     } catch (err) {
@@ -120,7 +120,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user, onRefreshUse
           <p className="text-sm text-slate-600">{t.daily.intro}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" data-testid="dashboard-find-prepare" onClick={() => startQuickBatch('live')}
+          <button type="button" data-testid="dashboard-find-prepare" onClick={() => navigate('/batches')}
             disabled={actionBusy || Boolean(user.automation_stopped_at)}
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
             <Play className="h-4 w-4" aria-hidden="true" />
