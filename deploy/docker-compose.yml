@@ -1,0 +1,136 @@
+name: ${COMPOSE_PROJECT_NAME:-applyflow-global}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: applyflow
+      POSTGRES_USER: applyflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD_FILE: ${POSTGRES_PASSWORD_FILE:-}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U applyflow -d applyflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Database port intentionally NOT published to host network for security.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Redis port intentionally NOT published to host network.
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    env_file:
+      - path: ${APPLYFLOW_ENV_FILE:-../.env}
+        required: false
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    env_file:
+      - path: ${APPLYFLOW_ENV_FILE:-../.env}
+        required: false
+    volumes:
+      - private_storage:/app/storage/private
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    env_file:
+      - path: ${APPLYFLOW_ENV_FILE:-../.env}
+        required: false
+    command: ["celery", "-A", "app.tasks.celery_app:celery_app", "worker", "--loglevel=info", "--concurrency=4"]
+    volumes:
+      - private_storage:/app/storage/private
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    env_file:
+      - path: ${APPLYFLOW_ENV_FILE:-../.env}
+        required: false
+    # Exactly ONE Beat scheduler instance must run to avoid duplicate schedule triggers.
+    command: ["celery", "-A", "app.tasks.celery_app:celery_app", "beat", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${APPLYFLOW_HTTP_PORT:-80}:80"
+      - "${APPLYFLOW_HTTPS_PORT:-443}:443"
+    environment:
+      HTTPS_DOMAIN: ${HTTPS_DOMAIN:-localhost}
+    volumes:
+      - ${APPLYFLOW_CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  pg_data:
+  redis_data:
+  private_storage:
+  caddy_data:
+  caddy_config:

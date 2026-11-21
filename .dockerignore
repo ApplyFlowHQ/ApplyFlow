@@ -1,0 +1,22 @@
+# Build only the runtime modules and explicitly named public assets.
+**
+!backend/app/**/*.py
+!backend/alembic/**/*.py
+!backend/alembic/script.py.mako
+!backend/alembic.ini
+!backend/requirements.lock
+!frontend/src/**/*.ts
+!frontend/src/**/*.tsx
+!frontend/src/**/*.css
+!frontend/public/favicon.png
+!frontend/public/pwa-192x192.png
+!frontend/public/pwa-512x512.png
+!frontend/public/offline.html
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/tsconfig.json
+!frontend/vite.config.ts
+!deploy/Dockerfile.backend
+!deploy/Dockerfile.frontend
+!deploy/nginx.conf

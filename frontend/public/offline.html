@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline — ApplyFlow Global</title>
+    <style>
+      body { font-family: system-ui, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 2rem; display: flex; min-height: 100vh; align-items: center; justify-content: center; }
+      .card { max-width: 28rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 2rem; box-shadow: 0 4px 20px rgba(15, 23, 42, .06); }
+      h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
+      p { color: #475569; line-height: 1.5; margin: 0 0 1rem; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>You are currently offline</h1>
+      <p>Your configured ApplyFlow Global server batches, inbox monitoring, and recurring schedules continue executing on the server when enabled.</p>
+      <p>Reconnect to view fresh tracker updates, upload CVs, or start new batches.</p>
+      <button onclick="window.location.reload()" style="background:#0f172a;color:#fff;border:none;padding:.65rem 1.1rem;border-radius:.5rem;font-weight:600;cursor:pointer;">Retry Connection</button>
+    </div>
+  </body>
+</html>

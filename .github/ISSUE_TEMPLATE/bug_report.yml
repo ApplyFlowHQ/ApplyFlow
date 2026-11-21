@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible problem using fictional data
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Use fictional details. Keep CV content, email, tokens, credentials, private logs and personal information out of this report. Report security issues privately."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Operating system, browser and installation method
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized diagnostic excerpt
+    validations:
+      required: false
