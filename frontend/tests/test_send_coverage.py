@@ -103,3 +103,34 @@ def test_partial_scan_confirmation(browser, isolated_app, tmp_path, locale):
         with session_scope() as db:
             assert db.scalar(select(func.count()).select_from(OutboxEntry)) == 1
         assert not app.messages
+
+
+@pytest.mark.parametrize("failure", ["getItem", "setItem", None], ids=["read-denied", "write-denied", "available"])
+def test_language_storage_and_batch_navigation(browser, isolated_app, failure):
+    with browser.new_context(base_url=isolated_app.url) as context:
+        if failure:
+            context.add_init_script("""
+                const method = %s;
+                const original = Storage.prototype[method];
+                Storage.prototype[method] = function(key, ...args) {
+                    if (key === 'applyflow_locale') throw new DOMException('Storage unavailable', 'SecurityError');
+                    return original.call(this, key, ...args);
+                };
+            """ % repr(failure))
+        page = context.new_page()
+        prepare_workspace(page.request, "en")
+        page.goto(isolated_app.url + "/batches")
+        action = page.get_by_test_id("find-and-prepare")
+        expect(action).to_be_visible()
+        for toggle, lang, direction in [("العربية", "ar", "rtl"), ("English", "en", "ltr")]:
+            with page.expect_response(lambda r: r.request.method == "PATCH" and r.url.endswith("/account/settings")):
+                page.get_by_role("button", name=toggle, exact=True).click()
+            expect(page.locator("html")).to_have_attribute("lang", lang)
+            expect(page.locator("html")).to_have_attribute("dir", direction)
+            expect(action).to_be_visible()
+            if failure is None:
+                assert page.evaluate("localStorage.getItem('applyflow_locale')") == lang
+                page.reload()
+                expect(action).to_be_visible()
+                expect(page.locator("html")).to_have_attribute("lang", lang)
+                expect(page.locator("html")).to_have_attribute("dir", direction)
