@@ -145,7 +145,7 @@ def isolated_app(isolated_test_env, frontend, monkeypatch):
         ))
         monkeypatch.setattr(outbox, "get_mailbox_transport", lambda db, conn: providers)
         app = create_app()
-        for path in ("/", "/cvs", "/batches", "/tracker"):
+        for path in ("/", "/setup", "/cvs", "/batches", "/tracker"):
             app.add_api_route(path, lambda: FileResponse(frontend / "index.html"), include_in_schema=False)
         app.mount("/", StaticFiles(directory=frontend))
         server = uvicorn.Server(uvicorn.Config(app, access_log=False, log_level="warning"))
