@@ -1,7 +1,9 @@
 # Report a vulnerability privately
 
-When enabled, open the repository’s **Security → Report a vulnerability** form. Include the affected revision, component, expected protection, observed impact and a minimal fictional example. Omit credentials, CVs, email content, private URLs and production logs.
+Sign in to GitHub, open **Security and quality** on the ApplyFlow repository, and select **Report a vulnerability**. Submit the form to share your report privately with the maintainers. Use the resulting advisory thread for follow-up. [Private reporting form](https://github.com/ApplyFlowHQ/ApplyFlow/security/advisories/new)
 
-If private reporting is unavailable, ask a maintainer for a confidential contact through their published project contact channel. Share only the request for a channel until you have one. Maintainers should enable private reporting or publish a monitored private contact before accepting reports. Do not disclose details in issues, discussions or pull requests.
+Include the affected commit or version, the component, the protection you expected, and the impact you observed. Give the smallest reproducible example you can, using fictional data. If the form is unavailable, keep the details private while the maintainers restore the channel.
 
-Maintainers will confirm scope privately, coordinate remediation and agree on advisory timing with the reporter. If a real key was exposed, its owner should rotate it privately, review access and remove it from any publishable history. Credential rotation and mailbox revocation require the operator’s coordination. There is no published supported-version or response-time guarantee yet.
+Never disclose vulnerability details, credentials, OAuth tokens, CVs, mailbox contents, application records or private logs in public Issues, Discussions or pull requests. Leave real personal data and secrets out of the private report as well. If a credential has been exposed, its owner should rotate or revoke it privately.
+
+Please give maintainers time to assess the report and coordinate a fix and disclosure date with you before publishing details. ApplyFlow has no formally guaranteed supported-version policy or response time.
