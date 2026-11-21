@@ -793,3 +793,27 @@ def test_fixture_batch_uses_only_offline_sources(db_session, monkeypatch):
     assert {row["provider"] for row in batch.sources_searched_json} == {"demo_fixture"}
     assert not db_session.scalars(select(OutboxEntry)).first()
 
+
+@pytest.mark.parametrize(("mode", "status"), [
+    ("demo_fixture", "completed"), ("dry_run", "completed"), ("live", "cancelled"),
+])
+def test_worker_global_stop_allows_only_manual_non_sending_modes(db_session, monkeypatch, mode, status):
+    user, *_ = _seed_vnext_user(db_session)
+    user.automation_stopped_at = utcnow()
+    batch = Batch(user_id=user.id, mode=mode, discovery_stage="queued",
+                  checkpoint_json={"pasted_candidate": batch_runner.serialize_candidate(vacancy())}
+                  if mode == "dry_run" else {})
+    db_session.add(batch)
+    db_session.commit()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Stopped manual evaluation called an external service")
+
+    monkeypatch.setattr(batch_runner, "sync_gmail_sent_history", forbidden)
+    monkeypatch.setattr(batch_runner, "_get_configured_search_providers", forbidden)
+    assert task_run_batch.run(batch.id) == status
+    db_session.refresh(batch)
+    assert (batch.discovered_count > 0) == (mode != "live")
+    assert task_run_batch.run(batch.id) == status
+    assert not db_session.scalars(select(OutboxEntry)).first()
+

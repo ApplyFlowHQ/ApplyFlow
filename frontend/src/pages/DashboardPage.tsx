@@ -120,12 +120,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user, onRefreshUse
           <p className="text-sm text-slate-600">{t.daily.intro}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" data-testid="dashboard-find-prepare" onClick={() => navigate('/batches')}
-            disabled={actionBusy || Boolean(user.automation_stopped_at)}
+          <Link to="/batches" data-testid="dashboard-find-prepare"
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
             <Play className="h-4 w-4" aria-hidden="true" />
-            {actionBusy ? t.daily.waiting : t.daily.find}
-          </button>
+            {t.daily.find}
+          </Link>
           <Link to="/tracker?tab=review" className="text-sm font-semibold text-indigo-700 hover:underline">{t.batches.openReviewQueue}</Link>
           <details className="text-xs text-slate-700">
             <summary className="cursor-pointer">{t.daily.manual}</summary>

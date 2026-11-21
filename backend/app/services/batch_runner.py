@@ -10,7 +10,7 @@ from dataclasses import asdict, replace
 from datetime import datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -668,10 +668,13 @@ def execute_batch_pipeline(
         candidate_overrides = [restore_candidate(checkpoint["pasted_candidate"])]
     max_search_queries_override = checkpoint.get("max_search_queries", max_search_queries_override)
 
+    # Evaluate the stored mode when renewing a lease, including after a concurrent stop.
+    stop_allows_mode = or_(User.automation_stopped_at.is_(None), Batch.mode.in_(("dry_run", "demo_fixture")))
+
     def check_claim() -> None:
         if lease_token and not db.scalar(select(Batch.id).join(User, User.id == Batch.user_id).where(
             Batch.id == batch.id, Batch.status == "running", Batch.lease_token == lease_token,
-            User.deleted_at.is_(None), User.is_suspended.is_(False), User.automation_stopped_at.is_(None),
+            User.deleted_at.is_(None), User.is_suspended.is_(False), stop_allows_mode,
         )):
             db.rollback()
             raise BatchClaimLost()
@@ -683,7 +686,7 @@ def execute_batch_pipeline(
             )
             if stage != "cancelled":
                 guard = guard.where(select(User.id).where(
-                    User.id == batch.user_id, User.automation_stopped_at.is_(None),
+                    User.id == batch.user_id, stop_allows_mode,
                     User.deleted_at.is_(None), User.is_suspended.is_(False),
                 ).exists())
             with db.no_autoflush:
@@ -703,7 +706,9 @@ def execute_batch_pipeline(
     pref = db.scalar(select(SearchPreference).where(SearchPreference.user_id == batch.user_id))
     profile = db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == batch.user_id))
 
-    if not user or user.deleted_at or user.is_suspended or user.automation_stopped_at:
+    if not user or user.deleted_at or user.is_suspended or (
+        user.automation_stopped_at and batch.mode not in ("dry_run", "demo_fixture")
+    ):
         batch.status = "cancelled"
         batch.pause_reason = "User automation stopped or account unavailable"
         batch.finished_at = now
@@ -730,7 +735,7 @@ def execute_batch_pipeline(
     )
 
     if (
-        batch.mode != "demo_fixture"
+        batch.mode == "live"
         and candidate_overrides is None
         and search_providers_override is None
         and not checkpoint.get("plan")
