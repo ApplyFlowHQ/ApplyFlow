@@ -753,3 +753,43 @@ def test_initial_paid_hits_survive_worker_loss_during_fetch(db_session, monkeypa
     assert batch.discovered_count == batch.drafted_count == 1
     assert len(batch.sources_searched_json) == 1 and batch.sources_searched_json[0]["provider"] == "offline"
     assert batch.estimated_cost_usd == pytest.approx(0.07) and ledger.count() == 1
+
+
+@pytest.mark.parametrize(("mode", "run_mode"), [
+    ("demo_fixture", "approval_required"), ("live", "demo_fixture"), ("dry_run", "demo_fixture"),
+    ("approval_required", "autopilot"), ("live", "dry_run"), ("demo_fixture", "autopilot"),
+])
+def test_api_rejects_conflicting_batch_modes(client, mode, run_mode):
+    from tests.test_security_and_isolation import _register_and_auth
+
+    _, headers = _register_and_auth(client, "tester@example.com")
+    response = client.post("/api/v1/batches", headers=headers,
+                           json={"mode": mode, "run_mode": run_mode, "run_immediately": False})
+    assert response.status_code == 422
+    assert client.get("/api/v1/batches").json()["batches"] == []
+
+
+def test_fixture_batch_uses_only_offline_sources(db_session, monkeypatch):
+    import socket
+
+    from app.services.ai import grounding
+
+    user, *_ = _seed_vnext_user(db_session)
+    batch = Batch(user_id=user.id, mode="demo_fixture", run_mode="demo_fixture")
+    db_session.add(batch)
+    db_session.commit()
+
+    def unexpected(*_args, **_kwargs):
+        pytest.fail("An isolated fixture batch tried to use an external service")
+
+    monkeypatch.setattr(batch_runner, "_get_configured_search_providers", unexpected)
+    monkeypatch.setattr(batch_runner, "sync_gmail_sent_history", unexpected)
+    monkeypatch.setattr(grounding, "get_configured_llm_provider", unexpected)
+    monkeypatch.setattr(socket, "getaddrinfo", unexpected)
+    monkeypatch.setattr(socket.socket, "connect", unexpected)
+    batch_runner.execute_batch_pipeline(db_session, batch=batch)
+    assert batch.status == "completed"
+    assert batch.discovered_count > 0
+    assert {row["provider"] for row in batch.sources_searched_json} == {"demo_fixture"}
+    assert not db_session.scalars(select(OutboxEntry)).first()
+

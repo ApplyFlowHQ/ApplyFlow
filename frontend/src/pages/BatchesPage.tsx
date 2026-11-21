@@ -48,7 +48,7 @@ export const BatchesPage: React.FC = () => {
   const [selectedBatch, setSelectedBatch] = useState<any | null>(null);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [cvs, setCvs] = useState<CvDocumentSummary[]>([]);
-  const [mode, setMode] = useState<'dry_run' | 'approval_required'  | 'demo_fixture'>('approval_required');
+  const [mode, setMode] = useState<'dry_run' | 'approval_required' | 'demo_fixture'>('demo_fixture');
   const [targetGoalCount, setTargetGoalCount] = useState<string>('');
   const [maxSearchQueries, setMaxSearchQueries] = useState<string>('');
   const [includeStandingInvitations, setIncludeStandingInvitations] = useState('');
@@ -191,25 +191,24 @@ export const BatchesPage: React.FC = () => {
     }
   };
 
-  const handleStartBatch = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const runMode = e ? mode : 'approval_required';
+  const handleStartBatch = async (event: React.FormEvent) => {
+    event.preventDefault();
     setBusy(true);
     setErr('');
     try {
       const body: any = {
-        mode: runMode === 'approval_required' ? 'live' : runMode,
-        run_mode: runMode,
+        mode: mode === 'approval_required' ? 'live' : mode,
+        run_mode: mode,
         run_immediately: true,
       };
-      if (e && includeStandingInvitations) body.include_standing_invitations = includeStandingInvitations === 'yes';
-      if (e && targetGoalCount.trim()) {
+      if (includeStandingInvitations) body.include_standing_invitations = includeStandingInvitations === 'yes';
+      if (targetGoalCount.trim()) {
         body.target_goal_count = Number(targetGoalCount);
       }
-      if (e && maxSearchQueries.trim()) {
+      if (maxSearchQueries.trim()) {
         body.max_search_queries = Number(maxSearchQueries);
       }
-      if (e && showPaste && pasteText.trim().length >= 20) {
+      if (showPaste && pasteText.trim().length >= 20) {
         body.pasted_posting = {
           title: pasteTitle || 'Public Job Posting',
           company_name: pasteCompany,
@@ -285,13 +284,7 @@ export const BatchesPage: React.FC = () => {
       <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
         <h2 className="text-base font-semibold text-slate-900">{t.daily.find}</h2>
         <p className="text-sm text-slate-600">{t.daily.intro}</p>
-        <button type="button" data-testid="find-and-prepare" disabled={busy} onClick={() => handleStartBatch()}
-          className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
-          {busy ? t.daily.waiting : t.daily.find}
-        </button>
-        <details>
-          <summary className="cursor-pointer text-sm font-medium text-slate-700">{t.daily.options}</summary>
-        <form onSubmit={handleStartBatch} className="mt-4 space-y-4">
+        <form onSubmit={handleStartBatch} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { id: 'dry_run', label: t.batches.modeDryRun },
@@ -307,6 +300,7 @@ export const BatchesPage: React.FC = () => {
                 <input
                   type="radio"
                   name="batch_mode"
+                  value={opt.id}
                   checked={mode === opt.id}
                   onChange={() => setMode(opt.id as any)}
                   className="mt-1"
@@ -316,97 +310,104 @@ export const BatchesPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              {t.preferences.standingInvites}
-              <select value={includeStandingInvitations} onChange={e => setIncludeStandingInvitations(e.target.value)}>
-                <option value="">{t.daily.defaultPref}</option>
-                <option value="yes">{t.daily.yes}</option>
-                <option value="no">{t.daily.no}</option>
-              </select>
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input type="checkbox" checked={showPaste} onChange={(e) => setShowPaste(e.target.checked)} />
-              <span>{t.batches.pasteToggle}</span>
-            </label>
-            <div className="flex items-center gap-2 text-xs text-slate-700">
-              <label htmlFor="batch-goal-count">{t.daily.requestedCount}</label>
-              <input
-                id="batch-goal-count"
-                type="number"
-                min={1}
-                max={50}
-                placeholder={t.daily.defaultPref}
-                value={targetGoalCount}
-                onChange={(e) => setTargetGoalCount(e.target.value)}
-                className="w-28 rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
-              />
-            </div>
-            <div className="flex items-center gap-2 text-xs text-slate-700">
-              <label htmlFor="batch-max-queries">{t.batches.queryBudgetLabel}:</label>
-              <input
-                id="batch-max-queries"
-                type="number"
-                min={1}
-                max={30}
-                placeholder={t.daily.defaultPref}
-                value={maxSearchQueries}
-                onChange={(e) => setMaxSearchQueries(e.target.value)}
-                className="w-28 rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
-              />
-            </div>
-          </div>
-
-          {showPaste && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
-              <input
-                type="text"
-                placeholder="Role title"
-                value={pasteTitle}
-                onChange={(e) => setPasteTitle(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
-              />
-              <input
-                type="text"
-                placeholder="Company name"
-                value={pasteCompany}
-                onChange={(e) => setPasteCompany(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
-              />
-              <input
-                type="url"
-                placeholder="Public job URL (optional)"
-                value={pasteUrl}
-                onChange={(e) => setPasteUrl(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
-              />
-              <input
-                type="text"
-                placeholder="Location (e.g. Dubai, UAE)"
-                value={pasteLocation}
-                onChange={(e) => setPasteLocation(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
-              />
-              <textarea
-                required minLength={20} rows={4}
-                placeholder="Paste full public job posting text including explicit CV email instructions..."
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-                className="md:col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
-              />
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-50"
-          >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            <span>{busy ? t.controls.loading : t.batches.startBtn}</span>
+          <button type="submit" data-testid="find-and-prepare" disabled={busy}
+            className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+            {busy ? t.daily.waiting : t.daily.find}
           </button>
+          <details className="space-y-4">
+            <summary className="cursor-pointer text-sm font-medium text-slate-700">{t.daily.options}</summary>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                {t.preferences.standingInvites}
+                <select value={includeStandingInvitations} onChange={e => setIncludeStandingInvitations(e.target.value)}>
+                  <option value="">{t.daily.defaultPref}</option>
+                  <option value="yes">{t.daily.yes}</option>
+                  <option value="no">{t.daily.no}</option>
+                </select>
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={showPaste} onChange={(e) => setShowPaste(e.target.checked)} />
+                <span>{t.batches.pasteToggle}</span>
+              </label>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <label htmlFor="batch-goal-count">{t.daily.requestedCount}</label>
+                <input
+                  id="batch-goal-count"
+                  type="number"
+                  min={1}
+                  max={50}
+                  placeholder={t.daily.defaultPref}
+                  value={targetGoalCount}
+                  onChange={(e) => setTargetGoalCount(e.target.value)}
+                  className="w-28 rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <label htmlFor="batch-max-queries">{t.batches.queryBudgetLabel}:</label>
+                <input
+                  id="batch-max-queries"
+                  type="number"
+                  min={1}
+                  max={30}
+                  placeholder={t.daily.defaultPref}
+                  value={maxSearchQueries}
+                  onChange={(e) => setMaxSearchQueries(e.target.value)}
+                  className="w-28 rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
+                />
+              </div>
+            </div>
+
+            {showPaste && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <input
+                  type="text"
+                  placeholder="Role title"
+                  value={pasteTitle}
+                  onChange={(e) => setPasteTitle(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                />
+                <input
+                  type="text"
+                  placeholder="Company name"
+                  value={pasteCompany}
+                  onChange={(e) => setPasteCompany(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                />
+                <input
+                  type="url"
+                  placeholder="Public job URL (optional)"
+                  value={pasteUrl}
+                  onChange={(e) => setPasteUrl(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                />
+                <input
+                  type="text"
+                  placeholder="Location (e.g. Dubai, UAE)"
+                  value={pasteLocation}
+                  onChange={(e) => setPasteLocation(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                />
+                <textarea
+                  required minLength={20} rows={4}
+                  placeholder="Paste full public job posting text including explicit CV email instructions..."
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  className="md:col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-50"
+            >
+              <Play className="h-4 w-4" aria-hidden="true" />
+              <span>{busy ? t.controls.loading : t.batches.startBtn}</span>
+            </button>
+          </details>
         </form>
-        </details>
       </section>
 
       <details className="rounded-xl border border-slate-200 bg-white p-3">

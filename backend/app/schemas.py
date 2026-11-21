@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class RegisterRequest(BaseModel):
@@ -174,6 +174,15 @@ class StartBatchRequest(BaseModel):
     budget_config: dict[str, Any] | None = None
     pasted_posting: PastedPostingInput | None = None
     run_immediately: bool = True
+
+    @model_validator(mode="after")
+    def validate_mode_pair(self) -> StartBatchRequest:
+        # Older clients can supply either field alone.
+        if self.run_mode is not None and "mode" in self.model_fields_set:
+            allowed = ("approval_required", "autopilot") if self.mode == "live" else (self.mode,)
+            if self.run_mode not in allowed:
+                raise ValueError("mode and run_mode must describe the same discovery workflow")
+        return self
 
 
 class DraftReviseRequest(BaseModel):

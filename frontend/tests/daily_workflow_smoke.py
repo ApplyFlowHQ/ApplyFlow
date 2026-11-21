@@ -408,7 +408,11 @@ def run(browser, locale, width):
     page.set_default_timeout(10000)
     page.goto("http://app.test/dashboard")
     page.get_by_test_id("dashboard-find-prepare").click()
-    page.wait_for_url("**/batches?selected=run-1")
+    page.wait_for_url("**/batches")
+    assert not state["mutations"]
+    expect(page.locator('input[value=demo_fixture]')).to_be_checked()
+    page.locator('input[value=approval_required]').check()
+    page.get_by_test_id("find-and-prepare").click()
     progress = page.get_by_test_id("batch-progress")
     expect(progress).to_contain_text(
         "Completed" if locale == "en" else "مكتمل", timeout=10000

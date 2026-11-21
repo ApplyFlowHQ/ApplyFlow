@@ -48,6 +48,7 @@ def test_partial_scan_confirmation(browser, isolated_app, tmp_path, locale):
 
         app.search_release.set()
         page.goto(app.url + "/batches")
+        page.locator('input[name=batch_mode][value=approval_required]').check()
         page.get_by_test_id("find-and-prepare").click()
         approve = page.locator('[data-testid^="approve-draft-btn-"]')
         expect(approve).to_be_enabled(timeout=30000)
