@@ -38,6 +38,63 @@ def outbox_count():
         return db.scalar(select(func.count()).select_from(OutboxEntry))
 
 
+@pytest.mark.parametrize("locale", ["en", "ar"], ids=["desktop-en", "mobile-ar"])
+@pytest.mark.parametrize("stopped", [False, True], ids=["active", "stopped"])
+def test_dashboard_chooser_opens_with_keyboard(locale, stopped, browser, isolated_app, tmp_path):
+    from tests.workflow_browser_harness import open_page, prepare_workspace
+
+    with open_page(browser, isolated_app.url, locale, tmp_path) as page:
+        _, headers = prepare_workspace(page.request, locale)
+        if stopped:
+            assert page.request.post("/api/v1/account/stop-automation", headers=headers).ok
+            rejected = page.request.post(
+                "/api/v1/batches",
+                headers=headers,
+                data={"mode": "live", "run_mode": "approval_required", "run_immediately": True},
+            )
+            assert rejected.status == 409
+            assert rejected.json()["detail"]["code"] == "AUTOMATION_STOPPED"
+
+        submissions = []
+
+        def record_submission(request):
+            if request.method == "POST" and request.url.endswith("/api/v1/batches"):
+                submissions.append(request.url)
+
+        page.on("request", record_submission)
+        page.goto("/dashboard")
+        shortcut = page.get_by_test_id("dashboard-find-prepare")
+        expect(shortcut).to_be_enabled()
+        shortcut.focus()
+        expect(shortcut).to_be_focused()
+        page.keyboard.press("Enter")
+        expect(page).to_have_url(isolated_app.url + "/batches")
+
+        form = page.locator("form").filter(has=page.get_by_test_id("find-and-prepare"))
+        demo = form.locator('input[value="demo_fixture"]')
+        expect(demo).to_be_checked()
+        expect(page.locator("html")).to_have_attribute("dir", "rtl" if locale == "ar" else "ltr")
+        assert form.evaluate("(form) => form.getBoundingClientRect().width <= window.innerWidth")
+
+        notice = page.locator("#discovery-paused")
+        buttons = form.locator('button[type="submit"]')
+        expect(buttons).to_have_count(2)
+        if stopped:
+            expect(notice).to_contain_text("الأتمتة المباشرة متوقفة" if locale == "ar" else "Live automation is stopped")
+            for button in buttons.all():
+                expect(button).to_be_disabled()
+        else:
+            expect(notice).to_have_count(0)
+            for button in buttons.all():
+                expect(button).to_be_enabled()
+
+        demo.focus()
+        page.keyboard.press("ArrowLeft")
+        expect(demo).not_to_be_checked()
+        assert not submissions
+        assert not page.request.get("/api/v1/batches", headers=headers).json()["batches"]
+
+
 @pytest.mark.parametrize("locale", ["en", "ar"])
 def test_both_batch_controls_persist_selected_mode(locale, browser, isolated_app, tmp_path, monkeypatch):
     from app.api import routes_automation

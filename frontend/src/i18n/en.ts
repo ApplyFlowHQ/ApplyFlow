@@ -235,6 +235,7 @@ export const en = {
   batches: {
     title: 'Batches & Recurring Schedules',
     startTitle: 'Run Discovery & Application Batch',
+    discoveryPaused: 'Live automation is stopped. You can review discovery options here. Resume automation before starting a discovery batch, including a dry run or demo.',
     modeDryRun: 'Dry Run (Real discovery & grounded drafts, zero sending)',
     modeApprovalRequired: 'Approval Required (Lock drafts in Review Queue before sending)',
     modeLive: 'Autopilot (Verified Official/Authorized auto-send within saved limits)',

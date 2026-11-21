@@ -41,7 +41,7 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 type AppStatusFilter = 'all' | 'ready' | 'needs_review' | 'approved' | 'queued' | 'duplicate_blocked' | 'accepted' | 'failed' | 'uncertain';
 
-export const BatchesPage: React.FC = () => {
+export const BatchesPage: React.FC<{ automationStopped: boolean }> = ({ automationStopped }) => {
   const { t, formatDateTime } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const [batches, setBatches] = useState<any[]>([]);
@@ -193,6 +193,7 @@ export const BatchesPage: React.FC = () => {
 
   const handleStartBatch = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (automationStopped) return;
     setBusy(true);
     setErr('');
     try {
@@ -284,7 +285,12 @@ export const BatchesPage: React.FC = () => {
       <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
         <h2 className="text-base font-semibold text-slate-900">{t.daily.find}</h2>
         <p className="text-sm text-slate-600">{t.daily.intro}</p>
-        <form onSubmit={handleStartBatch} className="space-y-4">
+        {automationStopped && (
+          <p id="discovery-paused" role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            {t.batches.discoveryPaused}
+          </p>
+        )}
+        <form onSubmit={handleStartBatch} aria-describedby={automationStopped ? "discovery-paused" : undefined} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { id: 'dry_run', label: t.batches.modeDryRun },
@@ -310,7 +316,7 @@ export const BatchesPage: React.FC = () => {
             ))}
           </div>
 
-          <button type="submit" data-testid="find-and-prepare" disabled={busy}
+          <button type="submit" data-testid="find-and-prepare" disabled={busy || automationStopped}
             className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
             {busy ? t.daily.waiting : t.daily.find}
           </button>
@@ -400,7 +406,7 @@ export const BatchesPage: React.FC = () => {
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || automationStopped}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-50"
             >
               <Play className="h-4 w-4" aria-hidden="true" />
