@@ -20,8 +20,12 @@ export const I18nProvider: React.FC<{ initialLocale?: Locale; children: React.Re
   children,
 }) => {
   const [locale, setLocaleState] = useState<Locale>(() => {
-    const saved = localStorage.getItem('applyflow_locale');
-    return saved === 'ar' || saved === 'en' ? saved : initialLocale;
+    try {
+      const saved = localStorage.getItem('applyflow_locale');
+      return saved === 'ar' || saved === 'en' ? saved : initialLocale;
+    } catch {
+      return initialLocale;
+    }
   });
 
   const dir: 'ltr' | 'rtl' = locale === 'ar' ? 'rtl' : 'ltr';
@@ -30,7 +34,11 @@ export const I18nProvider: React.FC<{ initialLocale?: Locale; children: React.Re
   useEffect(() => {
     document.documentElement.lang = locale;
     document.documentElement.dir = dir;
-    localStorage.setItem('applyflow_locale', locale);
+    try {
+      localStorage.setItem('applyflow_locale', locale);
+    } catch {
+      // Keep the active language in React state when browser storage is unavailable.
+    }
   }, [locale, dir]);
 
   const setLocale = (loc: Locale) => setLocaleState(loc);
