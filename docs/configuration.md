@@ -33,6 +33,6 @@ Private user integration settings, installation-wide settings and environment de
 
 ## Global Stop for your account
 
-Global Stop cancels pending application sends, disables active schedules and pauses automatic inbox polling. It blocks live discovery, follow-ups and test emails through the mailbox and installation settings. An email already handed off for delivery can still arrive. Resuming allows new work. Re-enable the schedules you want to run again.
+Global Stop cancels pending application sends, disables active schedules and pauses automatic inbox polling. It blocks live discovery, follow-up delivery and test emails through the mailbox and installation settings. An email already handed off for delivery can still arrive. Resuming allows new work. Re-enable the schedules you want to run again.
 
 You can open the discovery chooser while stopped. A manually started demo uses offline fictional data. A manually started dry run can use configured search and AI services and incur provider charges. Neither mode sends applications. Password-reset and account-verification emails remain available.
