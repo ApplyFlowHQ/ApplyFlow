@@ -9,12 +9,13 @@ from sqlalchemy import select
 
 from app.api.routes_automation import _serialize_batch, api_cancel_batch, api_pause_batch, api_resume_batch
 from app.db.base import utcnow
-from app.db.models import Application, Batch, JobPosting, MailboxConnection, OutboxEntry, RecipientHistory
+from app.db.models import Application, Batch, JobPosting, MailboxConnection, OutboxEntry, RecipientHistory, Schedule
 from app.services import batch_runner
 from app.services.approval import approve_application_for_send
 from app.services.dedupe import record_duplicate_override
 from app.services.discovery.base import DiscoveredCandidate
 from app.services.outbox import claim_next_outbox_entry, enqueue_application_for_send, process_outbox_entry
+from app.services.scheduler import dispatch_due_schedules
 from app.tasks.maintenance import task_recover_discovery_batches
 from app.tasks.pipeline import task_run_batch
 from tests.test_vnext_acceptance_suite import _seed_vnext_user
@@ -794,13 +795,22 @@ def test_fixture_batch_uses_only_offline_sources(db_session, monkeypatch):
     assert not db_session.scalars(select(OutboxEntry)).first()
 
 
+def _dispatch_synthetic_schedule(db, user):
+    due = utcnow().replace(hour=9, minute=0, second=0, microsecond=0)
+    db.add(Schedule(user_id=user.id, name="Synthetic dry run", days_of_week_json=[due.weekday()]))
+    db.commit()
+    batch, = dispatch_due_schedules(db, now_utc=due)
+    return batch
+
+
 @pytest.mark.parametrize(("mode", "status"), [
     ("demo_fixture", "completed"), ("dry_run", "completed"), ("live", "cancelled"),
 ])
 def test_worker_global_stop_allows_only_manual_non_sending_modes(db_session, monkeypatch, mode, status):
     user, *_ = _seed_vnext_user(db_session)
+    _dispatch_synthetic_schedule(db_session, user)
     user.automation_stopped_at = utcnow()
-    batch = Batch(user_id=user.id, mode=mode, discovery_stage="queued",
+    batch = Batch(user_id=user.id, mode=mode, discovery_stage="queued", idempotency_key="sched-client-key",
                   checkpoint_json={"pasted_candidate": batch_runner.serialize_candidate(vacancy())}
                   if mode == "dry_run" else {})
     db_session.add(batch)
@@ -816,4 +826,60 @@ def test_worker_global_stop_allows_only_manual_non_sending_modes(db_session, mon
     assert (batch.discovered_count > 0) == (mode != "live")
     assert task_run_batch.run(batch.id) == status
     assert not db_session.scalars(select(OutboxEntry)).first()
+
+
+@pytest.mark.parametrize("expired_lease", [False, True])
+def test_worker_global_stop_rejects_delayed_schedule_at_entry(db_session, monkeypatch, expired_lease):
+    user, *_ = _seed_vnext_user(db_session)
+    batch = _dispatch_synthetic_schedule(db_session, user)
+    user.automation_stopped_at = utcnow()
+    if expired_lease:
+        batch.status = "running"
+        batch.lease_token = "previous-worker"
+        batch.lease_expires_at = utcnow() - timedelta(seconds=1)
+    db_session.commit()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Stopped delayed job reached provider setup")
+
+    monkeypatch.setattr(batch_runner, "_get_configured_search_providers", forbidden)
+    monkeypatch.setattr(batch_runner, "sync_gmail_sent_history", forbidden)
+    assert task_run_batch.run(batch.id) == "cancelled"
+    db_session.refresh(batch)
+    assert batch.pause_reason and batch.lease_token is None
+    assert task_run_batch.run(batch.id) == "cancelled"
+    assert not db_session.scalar(select(OutboxEntry))
+
+
+def test_worker_global_stop_fences_scheduled_lease_before_search(db_session, monkeypatch):
+    from app.services.discovery.base import SearchProviderOutcome
+
+    user, *_ = _seed_vnext_user(db_session)
+    batch = _dispatch_synthetic_schedule(db_session, user)
+    # An uncorrelated lease guard could authorize the scheduled row through this one.
+    manual = Batch(user_id=user.id, mode="dry_run")
+    db_session.add(manual)
+    db_session.commit()
+    searches = []
+
+    class Provider:
+        name = "offline"
+
+        async def search(self, query, **kwargs):
+            searches.append(query)
+            return SearchProviderOutcome(self.name, query)
+
+    def stop_after_claim(*_args):
+        user.automation_stopped_at = utcnow()
+        db_session.commit()
+        return [Provider()]
+
+    monkeypatch.setattr(batch_runner, "_get_configured_search_providers", stop_after_claim)
+    assert task_run_batch.run(batch.id) == "cancelled"
+    db_session.refresh(batch)
+    assert batch.lease_token is None and not batch.checkpoint_json
+    assert searches == []
+    assert task_run_batch.run(manual.id, max_search_queries=1) == "completed"
+    assert len(searches) == 1
+    assert not db_session.scalar(select(OutboxEntry))
 

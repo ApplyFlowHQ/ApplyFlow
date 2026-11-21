@@ -122,7 +122,7 @@ export const en = {
   controls: {
     stopAutomation: 'Stop Automation',
     resumeAutomation: 'Resume Automation',
-    automationStoppedBanner: 'Automation is paused globally. Queued sends and schedules will not execute until resumed.',
+    automationStoppedBanner: 'Automation is paused globally for your account. Pending application emails are cancelled and schedules are disabled. Account recovery and verification emails remain available.',
     offlineBanner: 'You are offline. Server automation continues running when active, while fresh data and batch controls require connectivity.',
     pwaUpdateAvailable: 'A new version of ApplyFlow Global is ready.',
     reloadNow: 'Update Now',

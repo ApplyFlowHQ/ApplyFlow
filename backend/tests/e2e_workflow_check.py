@@ -231,6 +231,14 @@ def test_dashboard_chooser_while_stopped(browser, isolated_app, tmp_path, locale
             action = "stop" if stopped else "resume"
             assert page.request.post("/api/v1/account/" + action + "-automation", headers=headers).ok
             page.goto(isolated_app.url + "/dashboard")
+            recovery_notice = page.get_by_text(
+                "تظل رسائل استعادة الحساب والتحقق منه متاحة." if locale == "ar"
+                else "Account recovery and verification emails remain available.", exact=False,
+            )
+            if stopped:
+                expect(recovery_notice).to_be_visible()
+            else:
+                expect(recovery_notice).to_have_count(0)
             shortcut = page.get_by_test_id("dashboard-find-prepare")
             expect(shortcut).to_have_role("link")
             shortcut.focus()

@@ -157,6 +157,42 @@ def _seed_live_user(db, *, limit: int = 20):
     return user, conn, ver, pdf_bytes, sha
 
 
+def test_periodic_mailbox_checks_respect_stop_and_resume(db_session, monkeypatch):
+    from app.tasks import maintenance
+
+    user, conn, *_ = _seed_live_user(db_session)
+    calls = []
+
+    def poll(db, mailbox):
+        calls.append(("poll", mailbox.id))
+        return 1
+
+    def sent_sync(db, *, conn, max_pages):
+        calls.append(("sync", conn.id))
+
+    monkeypatch.setattr(maintenance, "poll_mailbox_connection", poll)
+    monkeypatch.setattr(maintenance, "sync_gmail_sent_history", sent_sync)
+    user.automation_stopped_at = utcnow()
+    db_session.commit()
+    assert maintenance.task_poll_all_inboxes.run() == 0
+    assert calls == []
+
+    user.automation_stopped_at = None
+    db_session.commit()
+    assert maintenance.task_poll_all_inboxes.run() == 1
+    assert calls == [("poll", conn.id), ("sync", conn.id)]
+
+    def stop_during_poll(db, mailbox):
+        db.get(User, mailbox.user_id).automation_stopped_at = utcnow()
+        db.commit()
+        return poll(db, mailbox)
+
+    calls.clear()
+    monkeypatch.setattr(maintenance, "poll_mailbox_connection", stop_during_poll)
+    assert maintenance.task_poll_all_inboxes.run() == 1
+    assert calls == [("poll", conn.id)]
+
+
 def test_dry_run_vs_live_dedupe_cc_budget_and_frozen_attachment(db_session, monkeypatch):
     user, conn, ver, pdf_bytes, sha = _seed_live_user(db_session, limit=3)
     now = utcnow()
