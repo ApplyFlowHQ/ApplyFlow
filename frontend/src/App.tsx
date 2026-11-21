@@ -148,7 +148,7 @@ const AppRouter: React.FC<AppProps> = ({ pwaNeedsRefresh, onUpdatePwa }) => {
             />
             <Route path="/cvs" element={<CvContainerPage onUpdated={loadAllState} />} />
             <Route path="/preferences" element={<PreferencesPage onUpdated={loadAllState} />} />
-            <Route path="/batches" element={<BatchesPage />} />
+            <Route path="/batches" element={<BatchesPage automationStopped={Boolean(user.automation_stopped_at)} />} />
             <Route path="/tracker" element={<TrackerPage />} />
             <Route path="/settings" element={<SettingsPage user={user} onRefreshUser={loadAllState} onLoggedOut={() => setUser(null)} />} />
             <Route

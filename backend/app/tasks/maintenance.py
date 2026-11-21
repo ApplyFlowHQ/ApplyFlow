@@ -105,11 +105,16 @@ def task_poll_all_inboxes() -> int:
             )
         ).all()
         for conn in conns:
-            user = db.scalar(select(User).where(User.id == conn.user_id))
-            if not user or user.deleted_at or user.is_suspended:
+            active_account = select(User.id).where(
+                User.id == conn.user_id, User.deleted_at.is_(None), User.is_suspended.is_(False),
+                User.automation_stopped_at.is_(None),
+            )
+            if not db.scalar(active_account):
                 continue
             total_events += poll_mailbox_connection(db, conn)
             if conn.provider == "gmail_oauth" and GMAIL_READONLY_SCOPE in (conn.granted_scopes_json or []):
+                if not db.scalar(active_account):
+                    continue
                 try:
                     sync_gmail_sent_history(db, conn=conn, max_pages=3)
                 except Exception:

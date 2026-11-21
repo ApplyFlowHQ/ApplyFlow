@@ -435,6 +435,11 @@ def api_send_mailbox_self_test(
     )
     if not conn:
         raise HTTPException(status_code=404, detail={"code": "MAILBOX_NOT_FOUND", "message": "Mailbox not found"})
+    if user.automation_stopped_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "AUTOMATION_STOPPED", "message": "Global Stop Automation is active; resume automation first."},
+        )
     try:
         return send_owner_self_test_email(
             db,

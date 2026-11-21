@@ -122,7 +122,7 @@ export const en = {
   controls: {
     stopAutomation: 'Stop Automation',
     resumeAutomation: 'Resume Automation',
-    automationStoppedBanner: 'Automation is paused globally. Queued sends and schedules will not execute until resumed.',
+    automationStoppedBanner: 'Automation is paused globally for your account. Pending application emails are cancelled and schedules are disabled. Account recovery and verification emails remain available.',
     offlineBanner: 'You are offline. Server automation continues running when active, while fresh data and batch controls require connectivity.',
     pwaUpdateAvailable: 'A new version of ApplyFlow Global is ready.',
     reloadNow: 'Update Now',
@@ -235,6 +235,7 @@ export const en = {
   batches: {
     title: 'Batches & Recurring Schedules',
     startTitle: 'Run Discovery & Application Batch',
+    stoppedModes: 'Live automation is stopped. Demo uses fictional postings offline. Dry run can use configured search and AI providers to prepare drafts. Neither mode sends email.',
     modeDryRun: 'Dry Run (Real discovery & grounded drafts, zero sending)',
     modeApprovalRequired: 'Approval Required (Lock drafts in Review Queue before sending)',
     modeLive: 'Autopilot (Verified Official/Authorized auto-send within saved limits)',

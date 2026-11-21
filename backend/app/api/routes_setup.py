@@ -570,4 +570,9 @@ def api_send_test_email_to_self(
         require_installation_manager(db, user)
     except SetupError as exc:
         _raise_setup_http(exc)
+    if user.automation_stopped_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "AUTOMATION_STOPPED", "message": "Global Stop Automation is active; resume automation first."},
+        )
     return send_test_email_to_self(db, user=user).to_dict()

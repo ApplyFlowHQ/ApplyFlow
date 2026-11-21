@@ -10,7 +10,7 @@ from dataclasses import asdict, replace
 from datetime import datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -668,10 +668,20 @@ def execute_batch_pipeline(
         candidate_overrides = [restore_candidate(checkpoint["pasted_candidate"])]
     max_search_queries_override = checkpoint.get("max_search_queries", max_search_queries_override)
 
+    # The scheduler sets schedule_occurrence_id when it inserts the batch.
+    # In the lease UPDATE, both mode and origin must refer to the row being renewed.
+    permitted_owner = select(User).where(
+        User.id == Batch.user_id, User.deleted_at.is_(None), User.is_suspended.is_(False),
+        or_(User.automation_stopped_at.is_(None), and_(
+            Batch.mode.in_(("dry_run", "demo_fixture")), Batch.schedule_occurrence_id.is_(None),
+        )),
+    ).correlate(Batch)
+    owner_permits_work = permitted_owner.with_only_columns(User.id).exists()
+
     def check_claim() -> None:
-        if lease_token and not db.scalar(select(Batch.id).join(User, User.id == Batch.user_id).where(
+        if lease_token and not db.scalar(select(Batch.id).where(
             Batch.id == batch.id, Batch.status == "running", Batch.lease_token == lease_token,
-            User.deleted_at.is_(None), User.is_suspended.is_(False), User.automation_stopped_at.is_(None),
+            owner_permits_work,
         )):
             db.rollback()
             raise BatchClaimLost()
@@ -682,10 +692,7 @@ def execute_batch_pipeline(
                 Batch.id == batch.id, Batch.status == "running", Batch.lease_token == lease_token,
             )
             if stage != "cancelled":
-                guard = guard.where(select(User.id).where(
-                    User.id == batch.user_id, User.automation_stopped_at.is_(None),
-                    User.deleted_at.is_(None), User.is_suspended.is_(False),
-                ).exists())
+                guard = guard.where(owner_permits_work)
             with db.no_autoflush:
                 renewed = db.execute(guard.values(lease_expires_at=utcnow() + BATCH_LEASE)
                                      .execution_options(synchronize_session=False))
@@ -699,17 +706,16 @@ def execute_batch_pipeline(
             batch.lease_expires_at = None
         db.commit()
 
-    user = db.scalar(select(User).where(User.id == batch.user_id))
-    pref = db.scalar(select(SearchPreference).where(SearchPreference.user_id == batch.user_id))
-    profile = db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == batch.user_id))
-
-    if not user or user.deleted_at or user.is_suspended or user.automation_stopped_at:
+    user = db.scalar(permitted_owner.where(Batch.id == batch.id))
+    if user is None:
         batch.status = "cancelled"
         batch.pause_reason = "User automation stopped or account unavailable"
         batch.finished_at = now
         commit_stage(batch.status)
         return batch
 
+    pref = db.scalar(select(SearchPreference).where(SearchPreference.user_id == batch.user_id))
+    profile = db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == batch.user_id))
     if not pref or not profile:
         batch.status = "failed"
         batch.error_message = "Missing search preferences or candidate profile"
@@ -730,7 +736,7 @@ def execute_batch_pipeline(
     )
 
     if (
-        batch.mode != "demo_fixture"
+        batch.mode == "live"
         and candidate_overrides is None
         and search_providers_override is None
         and not checkpoint.get("plan")

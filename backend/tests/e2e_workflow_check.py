@@ -217,3 +217,48 @@ def test_claim_fields_have_localized_names_and_tab_order(browser, isolated_app, 
         expect(form.locator("button[type=submit]")).to_be_focused()
     finally:
         page.close()
+
+
+@pytest.mark.parametrize("locale", ["en", "ar"])
+def test_dashboard_chooser_while_stopped(browser, isolated_app, tmp_path, locale):
+    from tests.workflow_browser_harness import open_page, prepare_workspace
+
+    with open_page(browser, isolated_app.url, locale, tmp_path) as page:
+        _, headers = prepare_workspace(page.request, locale)
+        posts = []
+        page.on("request", lambda r: posts.append(r.url) if r.method == "POST" and r.url.endswith("/batches") else None)
+        for stopped in (True, False):
+            action = "stop" if stopped else "resume"
+            assert page.request.post("/api/v1/account/" + action + "-automation", headers=headers).ok
+            page.goto(isolated_app.url + "/dashboard")
+            recovery_notice = page.get_by_text(
+                "تظل رسائل استعادة الحساب والتحقق منه متاحة." if locale == "ar"
+                else "Account recovery and verification emails remain available.", exact=False,
+            )
+            if stopped:
+                expect(recovery_notice).to_be_visible()
+            else:
+                expect(recovery_notice).to_have_count(0)
+            shortcut = page.get_by_test_id("dashboard-find-prepare")
+            expect(shortcut).to_have_role("link")
+            shortcut.focus()
+            expect(shortcut).to_be_focused()
+            page.keyboard.press("Enter")
+            page.wait_for_url("**/batches")
+            demo = page.locator('input[value="demo_fixture"]')
+            dry = page.locator('input[value="dry_run"]')
+            live = page.locator('input[value="approval_required"]')
+            expect(demo).to_be_checked()
+            expect(dry).to_be_enabled()
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            if stopped:
+                expect(live).to_be_disabled()
+                expect(page.get_by_text(re.compile("Live automation is stopped|الأتمتة الحية متوقفة"))).to_be_visible()
+                response = page.request.post("/api/v1/batches", headers=headers,
+                                             data={"mode": "live", "run_mode": "approval_required"})
+                assert response.status == 409 and response.json()["detail"]["code"] == "AUTOMATION_STOPPED"
+            else:
+                expect(live).to_be_enabled()
+            assert posts == []
+            assert page.request.get("/api/v1/batches").json()["batches"] == []
+
